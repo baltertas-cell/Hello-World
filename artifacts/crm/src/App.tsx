@@ -146,21 +146,18 @@ function ClerkQueryClientCacheInvalidator() {
 function UserProvisioner() {
   const { user, isLoaded } = useUser();
   const provisioned = useRef(false);
-
   useEffect(() => {
     if (!isLoaded || !user || provisioned.current) return;
     provisioned.current = true;
-
     const email = user.primaryEmailAddress?.emailAddress ?? "";
     const name = user.fullName ?? user.firstName ?? "";
-
     fetch("/api/users/me", {
       method: "POST",
+      credentials: "include", // ← ось це було відсутнє
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name }),
     }).catch(() => {});
   }, [isLoaded, user]);
-
   return null;
 }
 
