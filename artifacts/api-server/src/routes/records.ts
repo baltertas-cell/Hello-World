@@ -11,9 +11,12 @@ import {
   UpdateRecordBody,
   DeleteRecordParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+router.use("/records", requireAuth as any);
 
 // GET /records/stats — must be before /records/:id
 router.get("/records/stats", async (req, res): Promise<void> => {
