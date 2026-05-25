@@ -1,3 +1,4 @@
+Ось повний файл excel-import.tsx:
 tsximport React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function ExcelImport() {
       const response = await fetch("/api/records/import", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -90,7 +92,6 @@ export function ExcelImport() {
         )}
       </Button>
 
-      {/* Діалог з результатом */}
       <Dialog open={showResult} onOpenChange={setShowResult}>
         <DialogContent className="max-w-md">
           <DialogHeader>
