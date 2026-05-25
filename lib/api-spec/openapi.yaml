@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CRM — Реєстр порушень та шахрайства
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: records
+    description: Записи реєстру порушень
 paths:
   /healthz:
     get:
@@ -24,6 +26,141 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /records:
+    get:
+      operationId: listRecords
+      tags: [records]
+      summary: Список записів
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Пошук по всіх полях
+        - in: query
+          name: fraudOnly
+          schema:
+            type: string
+          description: Тільки записи з ознаками шахрайства (true/false)
+        - in: query
+          name: internalFraud
+          schema:
+            type: string
+          description: Тільки внутрішнє шахрайство (true/false)
+        - in: query
+          name: dateFrom
+          schema:
+            type: string
+          description: Дата від (YYYY-MM-DD)
+        - in: query
+          name: dateTo
+          schema:
+            type: string
+          description: Дата до (YYYY-MM-DD)
+      responses:
+        "200":
+          description: Список записів
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Record"
+    post:
+      operationId: createRecord
+      tags: [records]
+      summary: Створити запис
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordInput"
+      responses:
+        "201":
+          description: Запис створено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Record"
+        "400":
+          description: Помилка валідації
+
+  /records/stats:
+    get:
+      operationId: getStats
+      tags: [records]
+      summary: Статистика по реєстру
+      responses:
+        "200":
+          description: Статистика
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /records/{id}:
+    get:
+      operationId: getRecord
+      tags: [records]
+      summary: Отримати запис
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Запис
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Record"
+        "404":
+          description: Не знайдено
+    patch:
+      operationId: updateRecord
+      tags: [records]
+      summary: Оновити запис
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordUpdate"
+      responses:
+        "200":
+          description: Оновлено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Record"
+        "404":
+          description: Не знайдено
+    delete:
+      operationId: deleteRecord
+      tags: [records]
+      summary: Видалити запис
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Видалено
+        "404":
+          description: Не знайдено
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +171,157 @@ components:
       required:
         - status
 
+    Record:
+      type: object
+      required: [id, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: ["string", "null"]
+          description: Дата
+        networkOrg:
+          type: ["string", "null"]
+          description: Відносно мережі/ГО
+        byFact:
+          type: ["string", "null"]
+          description: по Факту
+        basis:
+          type: ["string", "null"]
+          description: Підстава
+        fraudSigns:
+          type: ["string", "null"]
+          description: Ознаки шахрайства
+        internalFraud:
+          type: ["string", "null"]
+          description: Внутрішнє шахрайство
+        violationsFound:
+          type: ["string", "null"]
+          description: Виявлено порушень
+        damagesCaused:
+          type: ["string", "null"]
+          description: Завдано збитків
+        measuresТaken:
+          type: ["string", "null"]
+          description: Притягнуто до відповідальності/прийняті заходи
+        transferredToPolice:
+          type: ["string", "null"]
+          description: Передано в ОВС
+        policeResult:
+          type: ["string", "null"]
+          description: Результат ОВС
+        applicantVictim:
+          type: ["string", "null"]
+          description: Заявник / Потерпілий
+        investigationStatus:
+          type: ["string", "null"]
+          description: Стан контролю досудового розслідування
+        notes:
+          type: ["string", "null"]
+          description: Додаткові нотатки
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    RecordInput:
+      type: object
+      properties:
+        date:
+          type: ["string", "null"]
+        networkOrg:
+          type: ["string", "null"]
+        byFact:
+          type: ["string", "null"]
+        basis:
+          type: ["string", "null"]
+        fraudSigns:
+          type: ["string", "null"]
+        internalFraud:
+          type: ["string", "null"]
+        violationsFound:
+          type: ["string", "null"]
+        damagesCaused:
+          type: ["string", "null"]
+        measuresТaken:
+          type: ["string", "null"]
+        transferredToPolice:
+          type: ["string", "null"]
+        policeResult:
+          type: ["string", "null"]
+        applicantVictim:
+          type: ["string", "null"]
+        investigationStatus:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    RecordUpdate:
+      type: object
+      properties:
+        date:
+          type: ["string", "null"]
+        networkOrg:
+          type: ["string", "null"]
+        byFact:
+          type: ["string", "null"]
+        basis:
+          type: ["string", "null"]
+        fraudSigns:
+          type: ["string", "null"]
+        internalFraud:
+          type: ["string", "null"]
+        violationsFound:
+          type: ["string", "null"]
+        damagesCaused:
+          type: ["string", "null"]
+        measuresТaken:
+          type: ["string", "null"]
+        transferredToPolice:
+          type: ["string", "null"]
+        policeResult:
+          type: ["string", "null"]
+        applicantVictim:
+          type: ["string", "null"]
+        investigationStatus:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    Stats:
+      type: object
+      required: [total, withFraudSigns, internalFraud, transferredToPolice, totalDamages]
+      properties:
+        total:
+          type: integer
+          description: Всього записів
+        withFraudSigns:
+          type: integer
+          description: З ознаками шахрайства
+        internalFraud:
+          type: integer
+          description: Внутрішнє шахрайство
+        transferredToPolice:
+          type: integer
+          description: Передано в ОВС
+        totalDamages:
+          type: string
+          description: Загальна сума збитків
+
+    ImportResult:
+      type: object
+      required: [imported, skipped, errors]
+      properties:
+        imported:
+          type: integer
+          description: Успішно імпортовано
+        skipped:
+          type: integer
+          description: Пропущено (дублікати)
+        errors:
+          type: integer
+          description: Помилки
+        messages:
+          type: array
+          items:
+            type: string
