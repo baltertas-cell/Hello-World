@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+Файл знаходиться за шляхом: artifacts/crm/src/App.tsx
+Ось повний файл:
+tsximport { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -127,7 +129,6 @@ function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
-
   useEffect(() => {
     const unsubscribe = addListener(({ user }) => {
       const userId = user?.id ?? null;
@@ -138,7 +139,6 @@ function ClerkQueryClientCacheInvalidator() {
     });
     return unsubscribe;
   }, [addListener, qc]);
-
   return null;
 }
 
@@ -153,9 +153,9 @@ function UserProvisioner() {
     const name = user.fullName ?? user.firstName ?? "";
     fetch("/api/users/me", {
       method: "POST",
-      credentials: "include", // ← ось це було відсутнє
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name }),
+      body: JSON.stringify({ email, name, clerkId: user.id }),
     }).catch(() => {});
   }, [isLoaded, user]);
   return null;
@@ -181,7 +181,6 @@ function AppRoutes() {
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
-
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
