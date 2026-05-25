@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+typescriptimport { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { eq, ilike, or, and, gte, lte, sql } from "drizzle-orm";
@@ -33,7 +33,6 @@ router.get("/records/stats", async (req, res): Promise<void> => {
     .select({ count: sql<number>`count(*)::int` })
     .from(recordsTable)
     .where(sql`${recordsTable.transferredToPolice} IS NOT NULL AND ${recordsTable.transferredToPolice} != ''`);
-
   res.json({
     total: totalRow?.count ?? 0,
     withFraudSigns: fraudRow?.count ?? 0,
@@ -50,11 +49,8 @@ router.get("/records", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   const { search, fraudOnly, internalFraud, dateFrom, dateTo } = parsed.data;
-
   const conditions = [];
-
   if (search) {
     conditions.push(
       or(
@@ -68,31 +64,24 @@ router.get("/records", async (req, res): Promise<void> => {
       ),
     );
   }
-
   if (fraudOnly === "true") {
     conditions.push(sql`${recordsTable.fraudSigns} IS NOT NULL AND ${recordsTable.fraudSigns} != ''`);
   }
-
   if (internalFraud === "true") {
     conditions.push(sql`${recordsTable.internalFraud} IS NOT NULL AND ${recordsTable.internalFraud} != ''`);
   }
-
   if (dateFrom) {
     conditions.push(gte(recordsTable.date, dateFrom));
   }
-
   if (dateTo) {
     conditions.push(lte(recordsTable.date, dateTo));
   }
-
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-
   const records = await db
     .select()
     .from(recordsTable)
     .where(where)
     .orderBy(sql`${recordsTable.date} DESC NULLS LAST, ${recordsTable.createdAt} DESC`);
-
   res.json(records.map(toApiRecord));
 });
 
@@ -103,39 +92,56 @@ router.post("/records", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   const [record] = await db
     .insert(recordsTable)
     .values(fromApiInput(parsed.data))
     .returning();
-
   res.status(201).json(toApiRecord(record));
 });
 
-// POST /records/import — Excel import (multipart, not in codegen)
+// POST /records/import — Excel import
 router.post("/records/import", upload.single("file"), async (req, res): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: "Файл не завантажено" });
     return;
   }
-
   let wb: XLSX.WorkBook;
   try {
-    wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    wb = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
   } catch {
     res.status(400).json({ error: "Не вдалося прочитати файл Excel" });
     return;
   }
-
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+  // Розгортаємо об'єднані клітинки
+  if (ws["!merges"]) {
+    for (const merge of ws["!merges"]) {
+      const firstCell = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c });
+      const value = ws[firstCell];
+      for (let r = merge.s.r; r <= merge.e.r; r++) {
+        for (let c = merge.s.c; c <= merge.e.c; c++) {
+          const cellAddr = XLSX.utils.encode_cell({ r, c });
+          if (!ws[cellAddr] || !ws[cellAddr].v) {
+            ws[cellAddr] = value ? { ...value } : { t: "s", v: "" };
+          }
+        }
+      }
+    }
+  }
+
+  const rows: any[][] = XLSX.utils.sheet_to_json(ws, {
+    header: 1,
+    defval: "",
+    raw: false,
+  });
 
   if (rows.length < 2) {
     res.json({ imported: 0, skipped: 0, errors: 0, messages: ["Файл порожній або немає даних"] });
     return;
   }
 
-  const COLUMN_MAP: Record<string, keyof typeof fieldMap> = {
+  const COLUMN_MAP: Record<string, string> = {
     "Дата": "date",
     "Відносно мережі/ГО": "networkOrg",
     "по Факту": "byFact",
@@ -147,57 +153,57 @@ router.post("/records/import", upload.single("file"), async (req, res): Promise<
     "Притягнуто до відповідальності/прийняті заходи": "measuresTaken",
     "Передано в ОВС": "transferredToPolice",
     "Результат ОВС": "policeResult",
-    " Заявник / Потерпілий": "applicantVictim",
     "Заявник / Потерпілий": "applicantVictim",
+    " Заявник / Потерпілий": "applicantVictim",
     "Стан контролю досудового розслідування": "investigationStatus",
   };
 
-  const fieldMap = {
-    date: recordsTable.date,
-    networkOrg: recordsTable.networkOrg,
-    byFact: recordsTable.byFact,
-    basis: recordsTable.basis,
-    fraudSigns: recordsTable.fraudSigns,
-    internalFraud: recordsTable.internalFraud,
-    violationsFound: recordsTable.violationsFound,
-    damagesCaused: recordsTable.damagesCaused,
-    measuresTaken: recordsTable.measuresTaken,
-    transferredToPolice: recordsTable.transferredToPolice,
-    policeResult: recordsTable.policeResult,
-    applicantVictim: recordsTable.applicantVictim,
-    investigationStatus: recordsTable.investigationStatus,
-  };
+  const headers = rows[0].map((h) =>
+    String(h ?? "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 
-  const headers = rows[0].map((h) => String(h).trim());
+  req.log.info({ headers }, "Excel headers detected");
+
   let imported = 0;
+  let skipped = 0;
   let errors = 0;
   const messages: string[] = [];
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const isEmpty = row.every((cell) => !cell || String(cell).trim() === "");
-    if (isEmpty) continue;
+    if (isEmpty) { skipped++; continue; }
 
     const values: Record<string, string | null> = {};
     headers.forEach((header, idx) => {
-      const field = COLUMN_MAP[header];
+      const field = COLUMN_MAP[header] ?? COLUMN_MAP[header.replace(/\s+/g, " ").trim()];
       if (field) {
-        const val = String(row[idx] ?? "").trim();
+        const raw = row[idx];
+        const val = raw !== undefined && raw !== null ? String(raw).trim() : "";
         values[field] = val || null;
       }
     });
+
+    if (Object.keys(values).length === 0) {
+      skipped++;
+      messages.push(`Рядок ${i + 1}: не розпізнано жодної колонки`);
+      continue;
+    }
 
     try {
       await db.insert(recordsTable).values(values);
       imported++;
     } catch (err) {
       errors++;
-      messages.push(`Рядок ${i + 1}: помилка збереження`);
+      messages.push(`Рядок ${i + 1}: помилка збереження — ${(err as Error).message}`);
     }
   }
 
-  req.log.info({ imported, errors }, "Excel import complete");
-  res.json({ imported, skipped: 0, errors, messages });
+  req.log.info({ imported, skipped, errors }, "Excel import complete");
+  res.json({ imported, skipped, errors, messages });
 });
 
 // GET /records/:id
@@ -207,17 +213,14 @@ router.get("/records/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-
   const [record] = await db
     .select()
     .from(recordsTable)
     .where(eq(recordsTable.id, params.data.id));
-
   if (!record) {
     res.status(404).json({ error: "Запис не знайдено" });
     return;
   }
-
   res.json(toApiRecord(record));
 });
 
@@ -228,24 +231,20 @@ router.patch("/records/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-
   const parsed = UpdateRecordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   const [record] = await db
     .update(recordsTable)
     .set(fromApiInput(parsed.data))
     .where(eq(recordsTable.id, params.data.id))
     .returning();
-
   if (!record) {
     res.status(404).json({ error: "Запис не знайдено" });
     return;
   }
-
   res.json(toApiRecord(record));
 });
 
@@ -256,17 +255,14 @@ router.delete("/records/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-
   const [record] = await db
     .delete(recordsTable)
     .where(eq(recordsTable.id, params.data.id))
     .returning();
-
   if (!record) {
     res.status(404).json({ error: "Запис не знайдено" });
     return;
   }
-
   res.sendStatus(204);
 });
 
