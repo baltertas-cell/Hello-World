@@ -19,7 +19,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-8 bg-amber-500 rounded flex items-center justify-center text-slate-900">
             <ShieldAlert size={20} className="stroke-[2.5px]" />
           </div>
-          <span className="font-bold text-lg tracking-tight">Реєстр ОВК</span>
+          <span className="font-bold text-lg tracking-tight">Реєстр кримінальних проваджень</span>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navItems.map((item) => {
@@ -49,7 +49,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-8 bg-amber-500 rounded flex items-center justify-center text-slate-900 mr-3">
             <ShieldAlert size={20} />
           </div>
-          <span className="font-bold text-lg">Реєстр ОВК</span>
+          <span className="font-bold text-lg">Реєстр кримінальних проваджень</span>
         </header>
         
         <div className="flex-1 overflow-auto p-4 md:p-8">
